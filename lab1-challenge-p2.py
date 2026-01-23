@@ -7,8 +7,10 @@ import math
 brain = Brain()
 
 # Robot configuration code
-left_motor = Motor(Ports.PORT1, GearSetting.RATIO_18_1, False)
-right_motor = Motor(Ports.PORT2, GearSetting.RATIO_18_1, True)
+left_motor = Motor(Ports.PORT1, GearSetting.RATIO_18_1, True)
+right_motor = Motor(Ports.PORT2, GearSetting.RATIO_18_1, False)
+top_motor = Motor(Ports.PORT7, GearSetting.RATIO_18_1, True)
+
 controller_1 = Controller(PRIMARY)
 
 bumper_g = Bumper(brain.three_wire_port.g)
@@ -91,6 +93,15 @@ def drive_for(direction, turns, speed):
     right_motor.spin_for(direction, turns, TURNS, wait=False)
 
 
+
+def driveStraightWait(direction, distanceInCM, speed_CM_per_sec):
+    rpm = speed_CM_per_sec / wheelRadiusCM * 60 * gearRatio / (2 * PI)
+    degrees = distanceInCM * gearRatio * degreesPerCM
+
+    left_motor.spin_for(direction, degrees, DEGREES, rpm, RPM, False)
+    right_motor.spin_for(direction, degrees, DEGREES, rpm, RPM, True)
+
+
 # ======================
 # Event Handlers
 # ======================
@@ -131,15 +142,23 @@ def checkLight():
 
 def handleLight():
     global current_state
+    speed_CM_per_sec = 10;
+    rpm = speed_CM_per_sec / wheelRadiusCM * 60 * gearRatio / (2 * PI)
 
     if current_state == DRIVING_FWD:
         print(
             "FORWARD -> BACKWARD, light sensor at %d"
             % lightSensor.reflectivity(PERCENT)
         )
-        current_state = DRIVING_BKWD
-        drive_for(REVERSE, 5, 60)
-
+        current_state = IDLE
+        left_motor.stop()
+        right_motor.stop()
+        driveStraightWait(REVERSE, 15, 5)
+        top_motor.spin_to_position(150, DEGREES, rpm/2, RPM)
+        driveStraightWait(FORWARD, 15, 5)
+        top_motor.spin_to_position(0, DEGREES, rpm/2, RPM)
+        print("Torque: %.3f" % top_motor.torque())
+        top_motor.torque()
 
 wasMoving = False
 
@@ -179,6 +198,7 @@ bumper_g.pressed(handleBumperG)
 # ======================
 # Main Loop
 # ======================
+top_motor.set_position(0, DEGREES)
 while True:
     if checkMotionComplete():
         handleMotionComplete()
@@ -186,5 +206,5 @@ while True:
     if checkLight():
         handleLight()
 
-    print("Distance:", range_finder_front.distance(MM))
+    #print("Distance:", range_finder_front.distance(MM))
     wait(10)
